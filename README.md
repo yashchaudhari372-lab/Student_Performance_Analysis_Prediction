@@ -157,15 +157,6 @@ The repository provides a saved model but does not publish a reproducible test-s
 
 To document reliable performance, evaluate the saved model on an original held-out test set with the same preprocessing and feature order used during training. Include class-wise precision, recall, F1-score, and a confusion matrix.
 
-## 🖼️ Screenshots
-
-Add screenshots of the application to an `assets/` folder and uncomment these lines once the images exist:
-
-```markdown
-<!-- ![Student input dashboard](assets/student-input.png) -->
-<!-- ![Prediction and radar chart](assets/prediction-result.png) -->
-```
-
 ## 🎯 Applications
 
 - Educational data analytics demonstrations
