@@ -5,7 +5,7 @@ from flask import Flask, render_template_string, request, jsonify
 
 app = Flask(__name__)
 
-# Resolve model path dynamically for both local runs and Vercel serverless environments
+# Dynamically resolve relative file path for local and serverless execution
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, 'model.pkl')
 
@@ -15,139 +15,192 @@ if os.path.exists(MODEL_PATH):
         with open(MODEL_PATH, 'rb') as f:
             model = pickle.load(f)
     except Exception as e:
-        print(f"Error loading model: {e}")
+        print(f"Model load error: {e}")
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="indigo">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduPulse AI | Predictive Student Intelligence Engine</title>
+    <title>Student Performance Analysis Prediction</title>
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <!-- FontAwesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        :root {
-            --bg-base: #090d16;
-            --bg-surface: #0f172a;
-            --bg-elevated: #162036;
-            --border: rgba(148, 163, 184, 0.12);
-            --border-highlight: rgba(99, 102, 241, 0.3);
-            --primary: #4f46e5;
-            --primary-glow: rgba(79, 70, 229, 0.25);
-            --cyan: #06b6d4;
-            --emerald: #10b981;
-            --rose: #f43f5e;
-            --amber: #f59e0b;
-            --text-heading: #f8fafc;
-            --text-body: #94a3b8;
-            --text-muted: #64748b;
+        /* Multi-Theme Palette Configurations */
+        :root[data-theme="indigo"] {
+            --bg-base: #0b0f19;
+            --bg-card: rgba(18, 24, 38, 0.85);
+            --bg-input: #111827;
+            --border-card: rgba(99, 102, 241, 0.2);
+            --border-input: rgba(255, 255, 255, 0.08);
+            --accent-primary: #6366f1;
+            --accent-secondary: #06b6d4;
+            --accent-gradient: linear-gradient(135deg, #6366f1, #06b6d4);
+            --glow: 0 10px 30px -10px rgba(99, 102, 241, 0.4);
+            --text-heading: #f9fafb;
+            --text-body: #9ca3af;
+        }
+
+        :root[data-theme="emerald"] {
+            --bg-base: #061412;
+            --bg-card: rgba(10, 30, 26, 0.85);
+            --bg-input: #08211d;
+            --border-card: rgba(16, 185, 129, 0.2);
+            --border-input: rgba(255, 255, 255, 0.08);
+            --accent-primary: #10b981;
+            --accent-secondary: #14b8a6;
+            --accent-gradient: linear-gradient(135deg, #10b981, #14b8a6);
+            --glow: 0 10px 30px -10px rgba(16, 185, 129, 0.4);
+            --text-heading: #ecfdf5;
+            --text-body: #a7f3d0;
+        }
+
+        :root[data-theme="crimson"] {
+            --bg-base: #14080e;
+            --bg-card: rgba(31, 14, 23, 0.85);
+            --bg-input: #230d19;
+            --border-card: rgba(244, 63, 94, 0.2);
+            --border-input: rgba(255, 255, 255, 0.08);
+            --accent-primary: #f43f5e;
+            --accent-secondary: #fb7185;
+            --accent-gradient: linear-gradient(135deg, #f43f5e, #fb7185);
+            --glow: 0 10px 30px -10px rgba(244, 63, 94, 0.4);
+            --text-heading: #fff1f2;
+            --text-body: #fecdd3;
+        }
+
+        :root[data-theme="amber"] {
+            --bg-base: #140d05;
+            --bg-card: rgba(33, 21, 10, 0.85);
+            --bg-input: #271707;
+            --border-card: rgba(245, 158, 11, 0.2);
+            --border-input: rgba(255, 255, 255, 0.08);
+            --accent-primary: #f59e0b;
+            --accent-secondary: #d97706;
+            --accent-gradient: linear-gradient(135deg, #f59e0b, #d97706);
+            --glow: 0 10px 30px -10px rgba(245, 158, 11, 0.4);
+            --text-heading: #fffbeb;
+            --text-body: #fde68a;
+        }
+
+        :root[data-theme="cyber"] {
+            --bg-base: #0c0814;
+            --bg-card: rgba(25, 16, 42, 0.85);
+            --bg-input: #190f2b;
+            --border-card: rgba(217, 70, 239, 0.2);
+            --border-input: rgba(255, 255, 255, 0.08);
+            --accent-primary: #d946ef;
+            --accent-secondary: #8b5cf6;
+            --accent-gradient: linear-gradient(135deg, #d946ef, #8b5cf6);
+            --glow: 0 10px 30px -10px rgba(217, 70, 239, 0.4);
+            --text-heading: #fdf4ff;
+            --text-body: #e879f9;
         }
 
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Plus Jakarta Sans', sans-serif;
             background-color: var(--bg-base);
             color: var(--text-heading);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            background-image: 
-                radial-gradient(ellipse at 15% 10%, rgba(79, 70, 229, 0.12) 0%, transparent 45%),
-                radial-gradient(ellipse at 85% 80%, rgba(6, 182, 212, 0.08) 0%, transparent 40%);
-            background-attachment: fixed;
         }
 
-        /* Top Navigation */
-        .navbar {
-            height: 72px;
-            border-bottom: 1px solid var(--border);
-            background: rgba(9, 13, 22, 0.85);
-            backdrop-filter: blur(20px);
+        /* Top Header */
+        header {
+            padding: 1.1rem 2.5rem;
             display: flex;
-            align-items: center;
             justify-content: space-between;
-            padding: 0 2.5rem;
+            align-items: center;
+            background: rgba(11, 15, 25, 0.7);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-card);
             position: sticky;
             top: 0;
-            z-index: 50;
+            z-index: 40;
         }
 
-        .brand-container {
+        .brand-meta {
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 12px;
         }
 
-        .brand-icon {
-            width: 42px;
-            height: 42px;
+        .brand-badge {
+            width: 40px;
+            height: 40px;
             border-radius: 12px;
-            background: linear-gradient(135deg, #4f46e5, #06b6d4);
+            background: var(--accent-gradient);
             display: grid;
             place-items: center;
-            font-size: 1.25rem;
-            color: #fff;
-            box-shadow: 0 8px 16px var(--primary-glow);
+            font-size: 1.15rem;
+            color: #ffffff;
+            box-shadow: var(--glow);
         }
 
-        .brand-text h1 {
-            font-family: 'Space Grotesk', sans-serif;
+        .brand-title {
             font-size: 1.15rem;
             font-weight: 700;
             letter-spacing: -0.02em;
         }
 
-        .brand-text p {
-            font-size: 0.72rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            font-weight: 600;
-        }
-
-        .system-pill {
+        .theme-strip {
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
-            padding: 6px 14px;
+            gap: 10px;
+            background: var(--bg-input);
+            padding: 6px 12px;
             border-radius: 9999px;
-            border: 1px solid var(--border);
-            background: var(--bg-surface);
+            border: 1px solid var(--border-card);
         }
 
-        .status-dot {
-            width: 7px;
-            height: 7px;
+        .theme-strip span {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-body);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-right: 4px;
+        }
+
+        .swatch-btn {
+            width: 22px;
+            height: 22px;
             border-radius: 50%;
-            background: var(--emerald);
-            box-shadow: 0 0 10px var(--emerald);
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: transform 0.2s;
         }
 
-        .status-dot.offline {
-            background: var(--amber);
-            box-shadow: 0 0 10px var(--amber);
-        }
+        .swatch-btn:hover { transform: scale(1.2); }
+        .swatch-btn.active { border-color: #ffffff; transform: scale(1.1); }
 
-        /* Main Workspace */
+        .swatch-indigo { background: linear-gradient(135deg, #6366f1, #06b6d4); }
+        .swatch-emerald { background: linear-gradient(135deg, #10b981, #14b8a6); }
+        .swatch-crimson { background: linear-gradient(135deg, #f43f5e, #fb7185); }
+        .swatch-amber { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .swatch-cyber { background: linear-gradient(135deg, #d946ef, #8b5cf6); }
+
+        /* Container Layout */
         .workspace {
-            max-width: 1440px;
+            max-width: 1400px;
             margin: 2rem auto;
-            padding: 0 2rem;
+            padding: 0 1.5rem;
             width: 100%;
             display: grid;
             grid-template-columns: 460px 1fr;
@@ -155,48 +208,44 @@ HTML_TEMPLATE = """
             flex: 1;
         }
 
-        @media (max-width: 1100px) {
+        @media (max-width: 1024px) {
             .workspace { grid-template-columns: 1fr; }
         }
 
-        /* Glass Cards */
-        .panel {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .panel-header {
-            padding: 1.25rem 1.75rem;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: rgba(255, 255, 255, 0.01);
-        }
-
-        .panel-title {
-            font-family: 'Space Grotesk', sans-serif;
-            font-weight: 600;
-            font-size: 0.95rem;
-            letter-spacing: -0.01em;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .panel-body {
+        /* Glass Panel Styling */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: 20px;
             padding: 1.75rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
             display: flex;
             flex-direction: column;
             gap: 1.25rem;
         }
 
-        /* Form Inputs */
-        .form-row {
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-input);
+            padding-bottom: 1rem;
+        }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-title i {
+            color: var(--accent-primary);
+        }
+
+        /* Input Controls */
+        .form-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 1rem;
@@ -208,221 +257,192 @@ HTML_TEMPLATE = """
             gap: 6px;
         }
 
-        .input-group label {
+        .input-group.full-width {
+            grid-column: span 2;
+        }
+
+        label {
             font-size: 0.75rem;
-            font-weight: 600;
+            font-weight: 700;
             color: var(--text-body);
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.04em;
         }
 
         .input-field {
-            background: var(--bg-elevated);
-            border: 1px solid var(--border);
-            border-radius: 10px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-input);
+            border-radius: 12px;
             padding: 0.75rem 0.9rem;
-            font-size: 0.9rem;
-            font-family: inherit;
             color: var(--text-heading);
+            font-family: inherit;
+            font-size: 0.9rem;
             outline: none;
-            transition: all 0.2s;
         }
 
         .input-field:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px var(--primary-glow);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
         }
 
-        .submit-action {
+        .btn-predict {
             margin-top: 0.5rem;
-            background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1rem;
+            border: none;
             border-radius: 12px;
-            padding: 0.95rem;
-            font-family: 'Space Grotesk', sans-serif;
-            font-weight: 600;
+            background: var(--accent-gradient);
+            color: #ffffff;
             font-size: 0.95rem;
-            color: #fff;
+            font-weight: 700;
             cursor: pointer;
+            box-shadow: var(--glow);
             display: flex;
-            justify-content: center;
             align-items: center;
+            justify-content: center;
             gap: 10px;
-            box-shadow: 0 8px 24px var(--primary-glow);
-            transition: all 0.2s ease;
         }
 
-        .submit-action:hover {
-            transform: translateY(-2px);
+        .btn-predict:hover {
             filter: brightness(1.1);
+            transform: translateY(-2px);
         }
 
-        /* Analytics Workspace */
-        .analytics-grid {
+        /* Analytics & Output Prediction Display */
+        .analytics-deck {
             display: flex;
             flex-direction: column;
             gap: 1.5rem;
         }
 
-        .kpi-deck {
-            display: grid;
-            grid-template-columns: 1.2fr 1fr 1fr;
-            gap: 1rem;
-        }
-
-        @media (max-width: 768px) {
-            .kpi-deck { grid-template-columns: 1fr; }
-        }
-
-        .kpi-card {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 1.25rem 1.5rem;
+        .prediction-hero-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: 20px;
+            padding: 2rem;
             display: flex;
-            flex-direction: column;
             justify-content: space-between;
+            align-items: center;
             position: relative;
             overflow: hidden;
         }
 
-        .kpi-card.hero {
-            background: linear-gradient(145deg, rgba(79, 70, 229, 0.15), rgba(15, 23, 42, 0.8));
-            border-color: var(--border-highlight);
+        .prediction-hero-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 6px;
+            background: var(--accent-gradient);
         }
 
-        .kpi-label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
+        .prediction-hero-title {
+            font-size: 0.8rem;
+            color: var(--text-body);
             text-transform: uppercase;
-            font-weight: 600;
+            font-weight: 700;
             letter-spacing: 0.05em;
         }
 
-        .kpi-value {
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 1.9rem;
+        .prediction-subtext {
+            font-size: 1.15rem;
             font-weight: 700;
-            margin-top: 0.35rem;
-            display: flex;
-            align-items: baseline;
-            gap: 8px;
+            margin-top: 4px;
         }
 
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 12px;
-            border-radius: 9999px;
-            font-size: 0.8rem;
-            font-weight: 700;
-            letter-spacing: 0.04em;
+        /* Strict YES / NO Badge Outputs */
+        .result-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 2.2rem;
+            font-weight: 800;
+            padding: 0.4rem 2.2rem;
+            border-radius: 16px;
+            letter-spacing: 1.5px;
+            text-align: center;
         }
 
-        .badge-success { background: rgba(16, 185, 129, 0.15); color: var(--emerald); border: 1px solid rgba(16, 185, 129, 0.3); }
-        .badge-danger { background: rgba(244, 63, 94, 0.15); color: var(--rose); border: 1px solid rgba(244, 63, 94, 0.3); }
+        .result-initial {
+            background: rgba(148, 163, 184, 0.15);
+            color: #94a3b8;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+        }
 
+        .result-yes {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border: 2px solid #10b981;
+            box-shadow: 0 0 25px rgba(16, 185, 129, 0.3);
+        }
+
+        .result-no {
+            background: rgba(244, 63, 94, 0.15);
+            color: #f43f5e;
+            border: 2px solid #f43f5e;
+            box-shadow: 0 0 25px rgba(244, 63, 94, 0.3);
+        }
+
+        /* Charts Container */
         .charts-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 1.5rem;
         }
 
-        @media (max-width: 900px) {
+        @media (max-width: 800px) {
             .charts-row { grid-template-columns: 1fr; }
         }
 
-        .chart-box {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: 16px;
+        .chart-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: 20px;
             padding: 1.5rem;
+            height: 310px;
             display: flex;
             flex-direction: column;
-            gap: 1rem;
-            height: 320px;
+            gap: 10px;
         }
 
-        .chart-wrapper {
+        .chart-box {
             position: relative;
             flex: 1;
             width: 100%;
-        }
-
-        /* Recommendation Section */
-        .rec-box {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 1.25rem 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 1.25rem;
-        }
-
-        .rec-icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 10px;
-            background: rgba(6, 182, 212, 0.15);
-            color: var(--cyan);
-            display: grid;
-            place-items: center;
-            font-size: 1.2rem;
-            flex-shrink: 0;
-        }
-
-        .rec-text h4 {
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 0.95rem;
-            font-weight: 600;
-        }
-
-        .rec-text p {
-            font-size: 0.85rem;
-            color: var(--text-body);
-            margin-top: 2px;
         }
     </style>
 </head>
 <body>
 
-    <nav class="navbar">
-        <div class="brand-container">
-            <div class="brand-icon">
-                <i class="fa-solid fa-graduation-cap"></i>
+    <header>
+        <div class="brand-meta">
+            <div class="brand-badge">
+                <i class="fa-solid fa-chart-pie"></i>
             </div>
-            <div class="brand-text">
-                <h1>EduPulse AI</h1>
-                <p>Enterprise Student Performance Intelligence</p>
-            </div>
+            <div class="brand-title">Student Performance Analysis Prediction</div>
         </div>
 
-        <div class="system-pill">
-            {% if model_loaded %}
-            <span class="status-dot"></span>
-            <span>RBF-SVC ENGINE READY</span>
-            {% else %}
-            <span class="status-dot offline"></span>
-            <span>HEURISTIC SIMULATION MODE</span>
-            {% endif %}
+        <div class="theme-strip">
+            <span>Themes</span>
+            <div class="swatch-btn swatch-indigo active" data-t="indigo" title="Indigo Modern"></div>
+            <div class="swatch-btn swatch-emerald" data-t="emerald" title="Emerald Matrix"></div>
+            <div class="swatch-btn swatch-crimson" data-t="crimson" title="Crimson Ember"></div>
+            <div class="swatch-btn swatch-amber" data-t="amber" title="Amber Dusk"></div>
+            <div class="swatch-btn swatch-cyber" data-t="cyber" title="Cyber Violet"></div>
         </div>
-    </nav>
+    </header>
 
     <main class="workspace">
         <!-- Input Parameters Section -->
-        <section class="panel">
-            <div class="panel-header">
-                <div class="panel-title">
-                    <i class="fa-solid fa-sliders" style="color: var(--cyan)"></i>
-                    <span>Candidate Profile & Metrics</span>
+        <section class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="fa-solid fa-sliders"></i>
+                    <span>Student Profile Inputs</span>
                 </div>
-                <span style="font-size: 0.75rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">9 FEATURES</span>
+                <span style="font-size: 0.75rem; color: var(--text-body); font-family: 'JetBrains Mono', monospace;">9 FEATURES</span>
             </div>
 
-            <form id="evaluationForm" class="panel-body">
-                <div class="form-row">
+            <form id="predictForm">
+                <div class="form-grid">
                     <div class="input-group">
                         <label>Gender</label>
                         <select name="gender" class="input-field">
@@ -430,141 +450,120 @@ HTML_TEMPLATE = """
                             <option value="1">Male</option>
                         </select>
                     </div>
+
                     <div class="input-group">
                         <label>Age</label>
-                        <input type="number" name="age" class="input-field" value="18" min="12" max="60" required>
+                        <input type="number" name="age" class="input-field" value="18" min="10" max="80" required>
                     </div>
-                </div>
 
-                <div class="form-row">
                     <div class="input-group">
-                        <label>Weekly Study (Hours)</label>
-                        <input type="number" step="0.5" name="study_hours" class="input-field" value="16.0" required>
+                        <label>Study Hours / Week</label>
+                        <input type="number" step="0.1" name="study_hours" class="input-field" value="16.5" required>
                     </div>
+
                     <div class="input-group">
                         <label>Attendance Rate (%)</label>
-                        <input type="number" step="0.5" name="attendance" class="input-field" value="88.0" min="0" max="100" required>
+                        <input type="number" step="0.1" name="attendance" class="input-field" value="86.0" min="0" max="100" required>
                     </div>
-                </div>
 
-                <div class="form-row">
                     <div class="input-group">
-                        <label>Parental Education</label>
+                        <label>Parent Education</label>
                         <select name="parent_edu" class="input-field">
                             <option value="0">High School</option>
-                            <option value="1" selected>Bachelor's Degree</option>
-                            <option value="2">Master's Degree</option>
-                            <option value="3">Doctorate (PhD)</option>
+                            <option value="1" selected>Bachelor's</option>
+                            <option value="2">Master's</option>
+                            <option value="3">Doctorate</option>
                         </select>
                     </div>
+
                     <div class="input-group">
                         <label>Internet Access</label>
                         <select name="internet" class="input-field">
-                            <option value="1" selected>Available</option>
-                            <option value="0">Unavailable</option>
+                            <option value="1" selected>Yes</option>
+                            <option value="0">No</option>
                         </select>
                     </div>
-                </div>
 
-                <div class="input-group">
-                    <label>Extracurricular Participation</label>
-                    <select name="extracurricular" class="input-field">
-                        <option value="1" selected>Active Member</option>
-                        <option value="0">None</option>
-                    </select>
-                </div>
-
-                <div class="form-row">
                     <div class="input-group">
-                        <label>Previous Term Score</label>
-                        <input type="number" step="0.1" name="prev_score" class="input-field" value="74.0" min="0" max="100" required>
+                        <label>Extracurricular</label>
+                        <select name="extracurricular" class="input-field">
+                            <option value="1" selected>Yes</option>
+                            <option value="0">No</option>
+                        </select>
                     </div>
+
                     <div class="input-group">
-                        <label>Current / Midterm Score</label>
-                        <input type="number" step="0.1" name="final_score" class="input-field" value="80.5" min="0" max="100" required>
+                        <label>Previous Score</label>
+                        <input type="number" step="0.1" name="prev_score" class="input-field" value="72.0" min="0" max="100" required>
+                    </div>
+
+                    <div class="input-group full-width">
+                        <label>Final / Midterm Score</label>
+                        <input type="number" step="0.1" name="final_score" class="input-field" value="79.5" min="0" max="100" required>
                     </div>
                 </div>
 
-                <button type="submit" class="submit-action">
-                    <i class="fa-solid fa-bolt"></i> Evaluate Performance Prognosis
+                <button type="submit" class="btn-predict full-width" style="width: 100%; margin-top: 1.25rem;">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Run Analysis & Predict
                 </button>
             </form>
         </section>
 
-        <!-- Dynamic Output & Intelligence Deck -->
-        <section class="analytics-grid">
-            <!-- Top KPI Deck -->
-            <div class="kpi-deck">
-                <div class="kpi-card hero">
-                    <span class="kpi-label">Outcome Prediction</span>
-                    <div class="kpi-value">
-                        <span id="badgeOutcome" class="status-badge badge-success">INITIALIZED</span>
-                    </div>
-                    <span id="decisionLabel" style="font-size: 0.78rem; color: var(--text-body); margin-top: 4px;">Ready to run inference</span>
+        <!-- Prediction Output Display -->
+        <section class="analytics-deck">
+            <div class="prediction-hero-card">
+                <div>
+                    <div class="prediction-hero-title">Output Prediction</div>
+                    <div class="prediction-subtext">Student Result</div>
                 </div>
-
-                <div class="kpi-card">
-                    <span class="kpi-label">Academic Momentum</span>
-                    <div class="kpi-value">
-                        <span id="deltaScore">+6.5</span>
-                        <span style="font-size: 0.85rem; color: var(--emerald); font-weight: 500;"><i class="fa-solid fa-arrow-trend-up"></i> pts</span>
-                    </div>
-                    <span style="font-size: 0.75rem; color: var(--text-muted);">Current vs Previous</span>
-                </div>
-
-                <div class="kpi-card">
-                    <span class="kpi-label">Engagement Quotient</span>
-                    <div class="kpi-value">
-                        <span id="engagementIdx">88%</span>
-                    </div>
-                    <span style="font-size: 0.75rem; color: var(--text-muted);">Attendance & Extracurricular</span>
-                </div>
+                <div id="outputResultBadge" class="result-badge result-initial">--</div>
             </div>
 
-            <!-- Visualization Row -->
+            <!-- Charts Dynamic Rendering -->
             <div class="charts-row">
-                <div class="chart-box">
-                    <span class="kpi-label">Feature Vector Distribution</span>
-                    <div class="chart-wrapper">
-                        <canvas id="radarChart"></canvas>
+                <div class="chart-panel">
+                    <span style="font-size: 0.75rem; color: var(--text-body); font-weight: 700; text-transform: uppercase;">Feature Metric Distribution</span>
+                    <div class="chart-box">
+                        <canvas id="radarDistChart"></canvas>
                     </div>
                 </div>
 
-                <div class="chart-box">
-                    <span class="kpi-label">Trajectory Comparison</span>
-                    <div class="chart-wrapper">
-                        <canvas id="barChart"></canvas>
+                <div class="chart-panel">
+                    <span style="font-size: 0.75rem; color: var(--text-body); font-weight: 700; text-transform: uppercase;">Academic Progression</span>
+                    <div class="chart-box">
+                        <canvas id="progressionBarChart"></canvas>
                     </div>
-                </div>
-            </div>
-
-            <!-- Strategic Action Advisory -->
-            <div class="rec-box">
-                <div class="rec-icon">
-                    <i class="fa-solid fa-compass"></i>
-                </div>
-                <div class="rec-text">
-                    <h4 id="advisoryTitle">Predictive Prognosis Standing By</h4>
-                    <p id="advisoryBody">Submit student attributes on the left to evaluate performance likelihood and generate proactive interventions.</p>
                 </div>
             </div>
         </section>
     </main>
 
     <script>
-        // Radar Chart Initialization
-        const ctxRadar = document.getElementById('radarChart').getContext('2d');
-        const radarChart = new Chart(ctxRadar, {
+        // Multi-Theme Switching System
+        const swatchBtns = document.querySelectorAll('.swatch-btn');
+        swatchBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                swatchBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const selectedTheme = btn.getAttribute('data-t');
+                document.documentElement.setAttribute('data-theme', selectedTheme);
+                refreshVisualTheme();
+            });
+        });
+
+        // Initialize Radar Chart
+        const ctxRadar = document.getElementById('radarDistChart').getContext('2d');
+        const radarDistChart = new Chart(ctxRadar, {
             type: 'radar',
             data: {
-                labels: ['Study Intensity', 'Attendance', 'Pre-Score', 'Current Score', 'Environment'],
+                labels: ['Study Hours', 'Attendance', 'Prev Score', 'Final Score', 'Parent Edu'],
                 datasets: [{
-                    label: 'Normalized Attributes',
-                    data: [55, 88, 74, 80.5, 75],
-                    backgroundColor: 'rgba(79, 70, 229, 0.25)',
+                    label: 'Current Attributes',
+                    data: [55, 86, 72, 79.5, 33],
+                    backgroundColor: 'rgba(99, 102, 241, 0.2)',
                     borderColor: '#6366f1',
-                    pointBackgroundColor: '#06b6d4',
-                    borderWidth: 2
+                    borderWidth: 2,
+                    pointBackgroundColor: '#06b6d4'
                 }]
             },
             options: {
@@ -572,9 +571,9 @@ HTML_TEMPLATE = """
                 maintainAspectRatio: false,
                 scales: {
                     r: {
-                        grid: { color: 'rgba(148, 163, 184, 0.1)' },
-                        angleLines: { color: 'rgba(148, 163, 184, 0.15)' },
-                        pointLabels: { color: '#94a3b8', font: { family: 'Inter', size: 10 } },
+                        grid: { color: 'rgba(255, 255, 255, 0.08)' },
+                        angleLines: { color: 'rgba(255, 255, 255, 0.08)' },
+                        pointLabels: { color: '#9ca3af', font: { family: 'Plus Jakarta Sans', size: 10 } },
                         ticks: { display: false }
                     }
                 },
@@ -582,15 +581,15 @@ HTML_TEMPLATE = """
             }
         });
 
-        // Bar Trajectory Initialization
-        const ctxBar = document.getElementById('barChart').getContext('2d');
-        const barChart = new Chart(ctxBar, {
+        // Initialize Progression Bar Chart
+        const ctxBar = document.getElementById('progressionBarChart').getContext('2d');
+        const progressionBarChart = new Chart(ctxBar, {
             type: 'bar',
             data: {
-                labels: ['Previous Score', 'Midterm Score', 'Weekly Study Hours'],
+                labels: ['Previous Score', 'Final Score', 'Study Hours'],
                 datasets: [{
-                    data: [74.0, 80.5, 16.0],
-                    backgroundColor: ['rgba(148, 163, 184, 0.3)', '#4f46e5', '#06b6d4'],
+                    data: [72.0, 79.5, 16.5],
+                    backgroundColor: ['rgba(156, 163, 175, 0.35)', '#6366f1', '#06b6d4'],
                     borderRadius: 8
                 }]
             },
@@ -598,15 +597,30 @@ HTML_TEMPLATE = """
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    y: { grid: { color: 'rgba(148, 163, 184, 0.08)' }, ticks: { color: '#64748b' } },
-                    x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                    y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af' } },
+                    x: { grid: { display: false }, ticks: { color: '#9ca3af' } }
                 },
                 plugins: { legend: { display: false } }
             }
         });
 
-        // Async Form Submission
-        document.getElementById('evaluationForm').addEventListener('submit', async (e) => {
+        function refreshVisualTheme() {
+            const rootStyle = getComputedStyle(document.documentElement);
+            const primary = rootStyle.getPropertyValue('--accent-primary').trim();
+            const secondary = rootStyle.getPropertyValue('--accent-secondary').trim();
+
+            radarDistChart.data.datasets[0].borderColor = primary;
+            radarDistChart.data.datasets[0].pointBackgroundColor = secondary;
+            radarDistChart.data.datasets[0].backgroundColor = primary + '33';
+            radarDistChart.update();
+
+            progressionBarChart.data.datasets[0].backgroundColor[1] = primary;
+            progressionBarChart.data.datasets[0].backgroundColor[2] = secondary;
+            progressionBarChart.update();
+        }
+
+        // Form Submit Handler & Prediction Extraction
+        document.getElementById('predictForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
 
@@ -615,59 +629,40 @@ HTML_TEMPLATE = """
                     method: 'POST',
                     body: formData
                 });
-                const data = await res.json();
+                const payload = await res.json();
 
-                if (data.status === 'success') {
-                    const isPositive = data.prediction.toLowerCase() === 'yes';
-                    const badge = document.getElementById('badgeOutcome');
-                    const decision = document.getElementById('decisionLabel');
-                    const advTitle = document.getElementById('advisoryTitle');
-                    const advBody = document.getElementById('advisoryBody');
+                if (payload.status === 'success') {
+                    const badge = document.getElementById('outputResultBadge');
+                    const cleanResult = payload.prediction.trim().toUpperCase();
 
-                    if (isPositive) {
-                        badge.className = 'status-badge badge-success';
-                        badge.innerHTML = '<i class="fa-solid fa-circle-check"></i> PASS PROSPECT';
-                        decision.innerText = 'High probability of passing target';
-                        advTitle.innerText = 'High Academic Stability Detected';
-                        advBody.innerText = 'Student demonstrates strong metric consistency. Retain study regimen and encourage leadership in extracurricular activities.';
+                    badge.innerText = cleanResult;
+
+                    if (cleanResult === 'YES') {
+                        badge.className = 'result-badge result-yes';
                     } else {
-                        badge.className = 'status-badge badge-danger';
-                        badge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> RISK DETECTED';
-                        decision.innerText = 'At risk of academic underperformance';
-                        advTitle.innerText = 'Targeted Intervention Advised';
-                        advBody.innerText = 'Current attendance and score trends suggest intervention is needed. Prioritize mandatory tutoring and weekly review checkpoints.';
+                        badge.className = 'result-badge result-no';
                     }
 
-                    // Delta computation
-                    const diff = (data.features.final_score - data.features.prev_score).toFixed(1);
-                    const deltaEl = document.getElementById('deltaScore');
-                    deltaEl.innerText = (diff >= 0 ? '+' : '') + diff;
-
-                    // Engagement computation
-                    document.getElementById('engagementIdx').innerText = Math.round(data.features.attendance) + '%';
-
-                    // Update Charts
-                    const studyNorm = Math.min((data.features.study_hours / 30) * 100, 100);
-                    const envNorm = ((data.features.parent_edu / 3) * 50) + (data.features.internet * 50);
-
-                    radarChart.data.datasets[0].data = [
-                        studyNorm,
-                        data.features.attendance,
-                        data.features.prev_score,
-                        data.features.final_score,
-                        envNorm
+                    // Dynamically refresh charts
+                    const studyNormalized = Math.min((payload.features.study_hours / 30) * 100, 100);
+                    radarDistChart.data.datasets[0].data = [
+                        studyNormalized,
+                        payload.features.attendance,
+                        payload.features.prev_score,
+                        payload.features.final_score,
+                        (payload.features.parent_edu / 3) * 100
                     ];
-                    radarChart.update();
+                    radarDistChart.update();
 
-                    barChart.data.datasets[0].data = [
-                        data.features.prev_score,
-                        data.features.final_score,
-                        data.features.study_hours
+                    progressionBarChart.data.datasets[0].data = [
+                        payload.features.prev_score,
+                        payload.features.final_score,
+                        payload.features.study_hours
                     ];
-                    barChart.update();
+                    progressionBarChart.update();
                 }
             } catch (err) {
-                console.error("Prediction error:", err);
+                console.error("Inference Error:", err);
             }
         });
     </script>
@@ -677,7 +672,7 @@ HTML_TEMPLATE = """
 
 @app.route('/')
 def index():
-    return render_template_string(HTML_TEMPLATE, model_loaded=(model is not None))
+    return render_template_string(HTML_TEMPLATE)
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -699,9 +694,10 @@ def predict():
 
         if model is not None:
             raw_pred = model.predict(features)[0]
-            prediction = str(raw_pred)
+            # Normalize model output strictly to "Yes" or "No"
+            prediction = "Yes" if str(raw_pred).strip().lower() in ['yes', '1', '1.0', 'true'] else "No"
         else:
-            # Fallback heuristic if model file isn't found in current directory
+            # Standalone fallback calculation
             prediction = "Yes" if (attendance >= 75 and (final_score + prev_score) / 2 >= 60) else "No"
 
         return jsonify({
@@ -722,7 +718,7 @@ def predict():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
-# Vercel WSGI entry point
+# Vercel entry point
 app_handler = app
 
 if __name__ == '__main__':
