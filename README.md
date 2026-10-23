@@ -352,7 +352,7 @@ Aspiring Data Scientist | Data Analyst | Machine Learning Enthusiast
 
 Interested in data analysis, machine learning, predictive modeling, and building interactive data-driven applications.
 
-- 💻 **GitHub:** [Siddhesh030](https://github.com/Siddhesh030)
+- 💻 **GitHub:** [yashchaudhari372-lab](https://github.com/yashchaudhari372-lab)
 - 🚀 **Live Project:** [Student Performance Analysis and Prediction](https://student-performance-analysis-prediction-g5trstnyy.vercel.app/)
 
 ## 🤝 Contributing
