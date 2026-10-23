@@ -5,16 +5,17 @@ from flask import Flask, render_template_string, request, jsonify
 
 app = Flask(__name__)
 
-MODEL_PATH = 'model.pkl'
+# Resolve model path dynamically for both local runs and Vercel serverless environments
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, 'model.pkl')
 
-# Load the trained SVC model
 model = None
 if os.path.exists(MODEL_PATH):
     try:
         with open(MODEL_PATH, 'rb') as f:
             model = pickle.load(f)
     except Exception as e:
-        print(f"Error loading {MODEL_PATH}: {e}")
+        print(f"Error loading model: {e}")
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -22,56 +23,63 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduPulse AI | Student Performance Analytics</title>
+    <title>EduPulse AI | Predictive Student Intelligence Engine</title>
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
         :root {
             --bg-base: #090d16;
-            --bg-surface: #111827;
-            --bg-surface-elevated: #1a2234;
-            --border-subtle: #1f293d;
-            --border-active: #3b82f6;
-            --brand-primary: #4f46e5;
-            --brand-gradient: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
-            --accent-green: #10b981;
-            --accent-red: #f43f5e;
+            --bg-surface: #0f172a;
+            --bg-elevated: #162036;
+            --border: rgba(148, 163, 184, 0.12);
+            --border-highlight: rgba(99, 102, 241, 0.3);
+            --primary: #4f46e5;
+            --primary-glow: rgba(79, 70, 229, 0.25);
+            --cyan: #06b6d4;
+            --emerald: #10b981;
+            --rose: #f43f5e;
+            --amber: #f59e0b;
             --text-heading: #f8fafc;
             --text-body: #94a3b8;
             --text-muted: #64748b;
         }
 
         * {
-            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Inter', sans-serif;
+            box-sizing: border-box;
         }
 
         body {
+            font-family: 'Inter', sans-serif;
             background-color: var(--bg-base);
             color: var(--text-heading);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            background-image: 
+                radial-gradient(ellipse at 15% 10%, rgba(79, 70, 229, 0.12) 0%, transparent 45%),
+                radial-gradient(ellipse at 85% 80%, rgba(6, 182, 212, 0.08) 0%, transparent 40%);
+            background-attachment: fixed;
         }
 
-        /* Top Navigation Bar */
-        .topbar {
-            height: 70px;
-            background: rgba(17, 24, 39, 0.85);
-            backdrop-filter: blur(14px);
-            border-bottom: 1px solid var(--border-subtle);
+        /* Top Navigation */
+        .navbar {
+            height: 72px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(9, 13, 22, 0.85);
+            backdrop-filter: blur(20px);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0 2rem;
+            padding: 0 2.5rem;
             position: sticky;
             top: 0;
             z-index: 50;
@@ -80,67 +88,67 @@ HTML_TEMPLATE = """
         .brand-container {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 14px;
         }
 
         .brand-icon {
-            width: 38px;
-            height: 38px;
-            border-radius: 10px;
-            background: var(--brand-gradient);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.15rem;
-            color: #ffffff;
-            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
-        }
-
-        .brand-title {
-            font-family: 'Plus Jakarta Sans', sans-serif;
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #4f46e5, #06b6d4);
+            display: grid;
+            place-items: center;
             font-size: 1.25rem;
-            font-weight: 800;
-            letter-spacing: -0.3px;
+            color: #fff;
+            box-shadow: 0 8px 16px var(--primary-glow);
         }
 
-        .brand-badge {
-            font-size: 0.72rem;
+        .brand-text h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.15rem;
             font-weight: 700;
-            padding: 3px 8px;
-            border-radius: 6px;
-            background: rgba(79, 70, 229, 0.15);
-            color: #818cf8;
-            border: 1px solid rgba(129, 140, 248, 0.3);
-            text-transform: uppercase;
+            letter-spacing: -0.02em;
         }
 
-        .system-status {
+        .brand-text p {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 600;
+        }
+
+        .system-pill {
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 0.85rem;
-            color: var(--text-body);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            padding: 6px 14px;
+            border-radius: 9999px;
+            border: 1px solid var(--border);
+            background: var(--bg-surface);
         }
 
         .status-dot {
-            width: 9px;
-            height: 9px;
+            width: 7px;
+            height: 7px;
             border-radius: 50%;
-            background: var(--accent-green);
-            box-shadow: 0 0 10px var(--accent-green);
+            background: var(--emerald);
+            box-shadow: 0 0 10px var(--emerald);
         }
 
         .status-dot.offline {
-            background: #f59e0b;
-            box-shadow: 0 0 10px #f59e0b;
+            background: var(--amber);
+            box-shadow: 0 0 10px var(--amber);
         }
 
-        /* Main Viewport Container */
-        .dashboard-wrapper {
+        /* Main Workspace */
+        .workspace {
             max-width: 1440px;
+            margin: 2rem auto;
+            padding: 0 2rem;
             width: 100%;
-            margin: 0 auto;
-            padding: 2rem;
             display: grid;
             grid-template-columns: 460px 1fr;
             gap: 2rem;
@@ -148,115 +156,109 @@ HTML_TEMPLATE = """
         }
 
         @media (max-width: 1100px) {
-            .dashboard-wrapper {
-                grid-template-columns: 1fr;
-            }
+            .workspace { grid-template-columns: 1fr; }
         }
 
-        /* Glass Panel Blocks */
-        .glass-panel {
+        /* Glass Cards */
+        .panel {
             background: var(--bg-surface);
-            border: 1px solid var(--border-subtle);
-            border-radius: 16px;
-            padding: 1.75rem;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
         .panel-header {
-            margin-bottom: 1.5rem;
+            padding: 1.25rem 1.75rem;
+            border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.01);
         }
 
-        .panel-header h2 {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            font-size: 1.15rem;
-            font-weight: 700;
-            color: var(--text-heading);
+        .panel-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            font-size: 0.95rem;
+            letter-spacing: -0.01em;
             display: flex;
             align-items: center;
             gap: 10px;
         }
 
-        .panel-header p {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-top: 4px;
+        .panel-body {
+            padding: 1.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
         }
 
-        /* Input Controls */
-        .form-grid {
+        /* Form Inputs */
+        .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 1rem;
         }
 
-        .form-field {
+        .input-group {
             display: flex;
             flex-direction: column;
             gap: 6px;
         }
 
-        .form-field.full {
-            grid-column: span 2;
-        }
-
-        label {
-            font-size: 0.8rem;
+        .input-group label {
+            font-size: 0.75rem;
             font-weight: 600;
             color: var(--text-body);
             text-transform: uppercase;
-            letter-spacing: 0.4px;
+            letter-spacing: 0.05em;
         }
 
-        input, select {
-            width: 100%;
-            background: var(--bg-surface-elevated);
-            border: 1px solid var(--border-subtle);
+        .input-field {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
             border-radius: 10px;
             padding: 0.75rem 0.9rem;
-            color: #ffffff;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
+            font-family: inherit;
+            color: var(--text-heading);
             outline: none;
+            transition: all 0.2s;
+        }
+
+        .input-field:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+
+        .submit-action {
+            margin-top: 0.5rem;
+            background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 0.95rem;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #fff;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 8px 24px var(--primary-glow);
             transition: all 0.2s ease;
         }
 
-        input:focus, select:focus {
-            border-color: var(--border-active);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-        }
-
-        .btn-predict {
-            margin-top: 1.5rem;
-            width: 100%;
-            background: var(--brand-gradient);
-            border: none;
-            border-radius: 10px;
-            color: #ffffff;
-            font-size: 1rem;
-            font-weight: 700;
-            padding: 1rem;
-            cursor: pointer;
-            box-shadow: 0 4px 18px rgba(79, 70, 229, 0.35);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            transition: transform 0.15s ease, filter 0.2s ease;
-        }
-
-        .btn-predict:hover {
+        .submit-action:hover {
+            transform: translateY(-2px);
             filter: brightness(1.1);
-            transform: translateY(-1px);
         }
 
-        .btn-predict:active {
-            transform: translateY(0);
-        }
-
-        /* Analytics & Intelligence Views */
-        .analytics-column {
+        /* Analytics Workspace */
+        .analytics-grid {
             display: flex;
             flex-direction: column;
             gap: 1.5rem;
@@ -264,63 +266,62 @@ HTML_TEMPLATE = """
 
         .kpi-deck {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: 1.2fr 1fr 1fr;
             gap: 1rem;
         }
 
         @media (max-width: 768px) {
-            .kpi-deck {
-                grid-template-columns: 1fr;
-            }
+            .kpi-deck { grid-template-columns: 1fr; }
         }
 
         .kpi-card {
             background: var(--bg-surface);
-            border: 1px solid var(--border-subtle);
-            border-radius: 14px;
-            padding: 1.25rem;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.25rem 1.5rem;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card.hero {
+            background: linear-gradient(145deg, rgba(79, 70, 229, 0.15), rgba(15, 23, 42, 0.8));
+            border-color: var(--border-highlight);
         }
 
         .kpi-label {
             font-size: 0.75rem;
-            font-weight: 600;
             color: var(--text-muted);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-weight: 600;
+            letter-spacing: 0.05em;
         }
 
-        .kpi-val {
-            font-size: 1.6rem;
-            font-weight: 800;
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            color: var(--text-heading);
+        .kpi-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.9rem;
+            font-weight: 700;
+            margin-top: 0.35rem;
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
         }
 
-        .badge-status {
+        .status-badge {
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 0.85rem;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 0.8rem;
             font-weight: 700;
-            width: fit-content;
+            letter-spacing: 0.04em;
         }
 
-        .badge-positive {
-            background: rgba(16, 185, 129, 0.15);
-            color: #34d399;
-            border: 1px solid rgba(16, 185, 129, 0.3);
-        }
-
-        .badge-warning {
-            background: rgba(244, 63, 94, 0.15);
-            color: #fb7185;
-            border: 1px solid rgba(244, 63, 94, 0.3);
-        }
+        .badge-success { background: rgba(16, 185, 129, 0.15); color: var(--emerald); border: 1px solid rgba(16, 185, 129, 0.3); }
+        .badge-danger { background: rgba(244, 63, 94, 0.15); color: var(--rose); border: 1px solid rgba(244, 63, 94, 0.3); }
 
         .charts-row {
             display: grid;
@@ -329,198 +330,241 @@ HTML_TEMPLATE = """
         }
 
         @media (max-width: 900px) {
-            .charts-row {
-                grid-template-columns: 1fr;
-            }
+            .charts-row { grid-template-columns: 1fr; }
         }
 
-        .chart-card {
+        .chart-box {
             background: var(--bg-surface);
-            border: 1px solid var(--border-subtle);
-            border-radius: 14px;
-            padding: 1.25rem;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
             display: flex;
             flex-direction: column;
+            gap: 1rem;
+            height: 320px;
         }
 
-        .chart-container {
+        .chart-wrapper {
             position: relative;
-            height: 240px;
+            flex: 1;
             width: 100%;
-            margin-top: 1rem;
         }
 
-        .advisory-box {
-            background: var(--bg-surface-elevated);
-            border-left: 4px solid var(--brand-primary);
-            border-radius: 8px;
-            padding: 1rem 1.25rem;
-            font-size: 0.9rem;
+        /* Recommendation Section */
+        .rec-box {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.25rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+        }
+
+        .rec-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            background: rgba(6, 182, 212, 0.15);
+            color: var(--cyan);
+            display: grid;
+            place-items: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .rec-text h4 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .rec-text p {
+            font-size: 0.85rem;
             color: var(--text-body);
-            line-height: 1.6;
+            margin-top: 2px;
         }
     </style>
 </head>
 <body>
 
-    <nav class="topbar">
+    <nav class="navbar">
         <div class="brand-container">
-            <div class="brand-icon"><i class="fa-solid fa-graduation-cap"></i></div>
-            <div>
-                <span class="brand-title">EduPulse</span>
-                <span class="brand-badge">Predictive Engine v2.0</span>
+            <div class="brand-icon">
+                <i class="fa-solid fa-graduation-cap"></i>
+            </div>
+            <div class="brand-text">
+                <h1>EduPulse AI</h1>
+                <p>Enterprise Student Performance Intelligence</p>
             </div>
         </div>
-        <div class="system-status">
+
+        <div class="system-pill">
             {% if model_loaded %}
-            <span class="status-dot"></span> <span>Model Loaded (RBF-SVC)</span>
+            <span class="status-dot"></span>
+            <span>RBF-SVC ENGINE READY</span>
             {% else %}
-            <span class="status-dot offline"></span> <span>Fallback Mode (`model.pkl` missing)</span>
+            <span class="status-dot offline"></span>
+            <span>HEURISTIC SIMULATION MODE</span>
             {% endif %}
         </div>
     </nav>
 
-    <div class="dashboard-wrapper">
-        <!-- Input Parameters Side -->
-        <div class="glass-panel">
+    <main class="workspace">
+        <!-- Input Parameters Section -->
+        <section class="panel">
             <div class="panel-header">
-                <div>
-                    <h2><i class="fa-solid fa-sliders"></i> Student Demographics & Records</h2>
-                    <p>Enter normalized attributes to compute performance outlook.</p>
+                <div class="panel-title">
+                    <i class="fa-solid fa-sliders" style="color: var(--cyan)"></i>
+                    <span>Candidate Profile & Metrics</span>
                 </div>
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">9 FEATURES</span>
             </div>
 
-            <form id="evaluationForm">
-                <div class="form-grid">
-                    <div class="form-field">
+            <form id="evaluationForm" class="panel-body">
+                <div class="form-row">
+                    <div class="input-group">
                         <label>Gender</label>
-                        <select name="gender">
+                        <select name="gender" class="input-field">
                             <option value="0">Female</option>
                             <option value="1">Male</option>
                         </select>
                     </div>
-
-                    <div class="form-field">
+                    <div class="input-group">
                         <label>Age</label>
-                        <input type="number" name="age" value="18" min="12" max="65" required>
+                        <input type="number" name="age" class="input-field" value="18" min="12" max="60" required>
                     </div>
+                </div>
 
-                    <div class="form-field">
+                <div class="form-row">
+                    <div class="input-group">
                         <label>Weekly Study (Hours)</label>
-                        <input type="number" step="0.1" name="study_hours" value="16.5" min="0" max="80" required>
+                        <input type="number" step="0.5" name="study_hours" class="input-field" value="16.0" required>
                     </div>
-
-                    <div class="form-field">
+                    <div class="input-group">
                         <label>Attendance Rate (%)</label>
-                        <input type="number" step="0.1" name="attendance" value="88.0" min="0" max="100" required>
+                        <input type="number" step="0.5" name="attendance" class="input-field" value="88.0" min="0" max="100" required>
                     </div>
+                </div>
 
-                    <div class="form-field">
+                <div class="form-row">
+                    <div class="input-group">
                         <label>Parental Education</label>
-                        <select name="parent_edu">
+                        <select name="parent_edu" class="input-field">
                             <option value="0">High School</option>
                             <option value="1" selected>Bachelor's Degree</option>
                             <option value="2">Master's Degree</option>
-                            <option value="3">Doctorate</option>
+                            <option value="3">Doctorate (PhD)</option>
                         </select>
                     </div>
-
-                    <div class="form-field">
-                        <label>Home Internet</label>
-                        <select name="internet">
-                            <option value="1">Available</option>
-                            <option value="0">Not Available</option>
+                    <div class="input-group">
+                        <label>Internet Access</label>
+                        <select name="internet" class="input-field">
+                            <option value="1" selected>Available</option>
+                            <option value="0">Unavailable</option>
                         </select>
-                    </div>
-
-                    <div class="form-field">
-                        <label>Extracurricular</label>
-                        <select name="extracurricular">
-                            <option value="1">Active</option>
-                            <option value="0">None</option>
-                        </select>
-                    </div>
-
-                    <div class="form-field">
-                        <label>Previous Score (0-100)</label>
-                        <input type="number" step="0.1" name="prev_score" value="74.0" min="0" max="100" required>
-                    </div>
-
-                    <div class="form-field full">
-                        <label>Final / Midterm Score (0-100)</label>
-                        <input type="number" step="0.1" name="final_score" value="82.5" min="0" max="100" required>
                     </div>
                 </div>
 
-                <button type="submit" class="btn-predict">
-                    <i class="fa-solid fa-bolt"></i> Evaluate Student Profile
+                <div class="input-group">
+                    <label>Extracurricular Participation</label>
+                    <select name="extracurricular" class="input-field">
+                        <option value="1" selected>Active Member</option>
+                        <option value="0">None</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="input-group">
+                        <label>Previous Term Score</label>
+                        <input type="number" step="0.1" name="prev_score" class="input-field" value="74.0" min="0" max="100" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Current / Midterm Score</label>
+                        <input type="number" step="0.1" name="final_score" class="input-field" value="80.5" min="0" max="100" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="submit-action">
+                    <i class="fa-solid fa-bolt"></i> Evaluate Performance Prognosis
                 </button>
             </form>
-        </div>
+        </section>
 
-        <!-- Right Side Analytics -->
-        <div class="analytics-column">
-            <!-- KPI Summary Cards -->
+        <!-- Dynamic Output & Intelligence Deck -->
+        <section class="analytics-grid">
+            <!-- Top KPI Deck -->
             <div class="kpi-deck">
-                <div class="kpi-card">
-                    <span class="kpi-label">Outcome Assessment</span>
-                    <div id="outcomeBadge" class="badge-status badge-positive">
-                        <i class="fa-solid fa-circle-check"></i> <span id="outcomeText">Qualified (Yes)</span>
+                <div class="kpi-card hero">
+                    <span class="kpi-label">Outcome Prediction</span>
+                    <div class="kpi-value">
+                        <span id="badgeOutcome" class="status-badge badge-success">INITIALIZED</span>
                     </div>
+                    <span id="decisionLabel" style="font-size: 0.78rem; color: var(--text-body); margin-top: 4px;">Ready to run inference</span>
                 </div>
 
                 <div class="kpi-card">
-                    <span class="kpi-label">Consistency Index</span>
-                    <div class="kpi-val" id="consistencyScore">86.2%</div>
+                    <span class="kpi-label">Academic Momentum</span>
+                    <div class="kpi-value">
+                        <span id="deltaScore">+6.5</span>
+                        <span style="font-size: 0.85rem; color: var(--emerald); font-weight: 500;"><i class="fa-solid fa-arrow-trend-up"></i> pts</span>
+                    </div>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Current vs Previous</span>
                 </div>
 
                 <div class="kpi-card">
-                    <span class="kpi-label">Intervention Priority</span>
-                    <div class="kpi-val" id="riskLevel" style="color: #34d399; font-size: 1.3rem;">Minimal</div>
+                    <span class="kpi-label">Engagement Quotient</span>
+                    <div class="kpi-value">
+                        <span id="engagementIdx">88%</span>
+                    </div>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Attendance & Extracurricular</span>
                 </div>
             </div>
 
-            <!-- Visual Analytics Grid -->
+            <!-- Visualization Row -->
             <div class="charts-row">
-                <div class="chart-card">
-                    <span class="kpi-label">Holistic Competency Radar</span>
-                    <div class="chart-container">
+                <div class="chart-box">
+                    <span class="kpi-label">Feature Vector Distribution</span>
+                    <div class="chart-wrapper">
                         <canvas id="radarChart"></canvas>
                     </div>
                 </div>
 
-                <div class="chart-card">
-                    <span class="kpi-label">Academic vs Cohort Benchmark</span>
-                    <div class="chart-container">
+                <div class="chart-box">
+                    <span class="kpi-label">Trajectory Comparison</span>
+                    <div class="chart-wrapper">
                         <canvas id="barChart"></canvas>
                     </div>
                 </div>
             </div>
 
-            <!-- Prescriptive Advisory -->
-            <div class="glass-panel" style="padding: 1.25rem;">
-                <span class="kpi-label" style="display: block; margin-bottom: 0.5rem;">Diagnostic Insight</span>
-                <div id="advisoryText" class="advisory-box">
-                    Student exhibits strong classroom engagement and consistent academic retention. Continuation of current study habits is projected to maintain high outcomes.
+            <!-- Strategic Action Advisory -->
+            <div class="rec-box">
+                <div class="rec-icon">
+                    <i class="fa-solid fa-compass"></i>
+                </div>
+                <div class="rec-text">
+                    <h4 id="advisoryTitle">Predictive Prognosis Standing By</h4>
+                    <p id="advisoryBody">Submit student attributes on the left to evaluate performance likelihood and generate proactive interventions.</p>
                 </div>
             </div>
-        </div>
-    </div>
+        </section>
+    </main>
 
     <script>
-        // Setup Radar Chart
-        const radarCtx = document.getElementById('radarChart').getContext('2d');
-        const radarChart = new Chart(radarCtx, {
+        // Radar Chart Initialization
+        const ctxRadar = document.getElementById('radarChart').getContext('2d');
+        const radarChart = new Chart(ctxRadar, {
             type: 'radar',
             data: {
-                labels: ['Study Intensity', 'Attendance', 'Prior Retention', 'Current Term', 'Socio-Edu Support'],
+                labels: ['Study Intensity', 'Attendance', 'Pre-Score', 'Current Score', 'Environment'],
                 datasets: [{
-                    label: 'Student Profile',
-                    data: [55, 88, 74, 82.5, 50],
+                    label: 'Normalized Attributes',
+                    data: [55, 88, 74, 80.5, 75],
                     backgroundColor: 'rgba(79, 70, 229, 0.25)',
                     borderColor: '#6366f1',
-                    borderWidth: 2,
-                    pointBackgroundColor: '#06b6d4'
+                    pointBackgroundColor: '#06b6d4',
+                    borderWidth: 2
                 }]
             },
             options: {
@@ -528,9 +572,9 @@ HTML_TEMPLATE = """
                 maintainAspectRatio: false,
                 scales: {
                     r: {
-                        angleLines: { color: 'rgba(255, 255, 255, 0.08)' },
-                        grid: { color: 'rgba(255, 255, 255, 0.08)' },
-                        pointLabels: { color: '#94a3b8', font: { size: 10, family: 'Inter' } },
+                        grid: { color: 'rgba(148, 163, 184, 0.1)' },
+                        angleLines: { color: 'rgba(148, 163, 184, 0.15)' },
+                        pointLabels: { color: '#94a3b8', font: { family: 'Inter', size: 10 } },
                         ticks: { display: false }
                     }
                 },
@@ -538,99 +582,92 @@ HTML_TEMPLATE = """
             }
         });
 
-        // Setup Cohort Benchmark Bar Chart
-        const barCtx = document.getElementById('barChart').getContext('2d');
-        const barChart = new Chart(barCtx, {
+        // Bar Trajectory Initialization
+        const ctxBar = document.getElementById('barChart').getContext('2d');
+        const barChart = new Chart(ctxBar, {
             type: 'bar',
             data: {
-                labels: ['Prev Score', 'Final Score', 'Attendance'],
-                datasets: [
-                    {
-                        label: 'Student',
-                        data: [74.0, 82.5, 88.0],
-                        backgroundColor: '#4f46e5',
-                        borderRadius: 6
-                    },
-                    {
-                        label: 'Median Cohort',
-                        data: [65.0, 68.0, 75.0],
-                        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                        borderRadius: 6
-                    }
-                ]
+                labels: ['Previous Score', 'Midterm Score', 'Weekly Study Hours'],
+                datasets: [{
+                    data: [74.0, 80.5, 16.0],
+                    backgroundColor: ['rgba(148, 163, 184, 0.3)', '#4f46e5', '#06b6d4'],
+                    borderRadius: 8
+                }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    x: { grid: { display: false }, ticks: { color: '#94a3b8' } },
-                    y: { max: 100, grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8' } }
+                    y: { grid: { color: 'rgba(148, 163, 184, 0.08)' }, ticks: { color: '#64748b' } },
+                    x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
                 },
-                plugins: {
-                    legend: { labels: { color: '#cbd5e1', font: { size: 11 } } }
-                }
+                plugins: { legend: { display: false } }
             }
         });
 
-        // Form Submit Handler
+        // Async Form Submission
         document.getElementById('evaluationForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
 
             try {
-                const response = await fetch('/predict', {
+                const res = await fetch('/predict', {
                     method: 'POST',
                     body: formData
                 });
-                const res = await response.json();
+                const data = await res.json();
 
-                if (res.status !== 'success') return;
+                if (data.status === 'success') {
+                    const isPositive = data.prediction.toLowerCase() === 'yes';
+                    const badge = document.getElementById('badgeOutcome');
+                    const decision = document.getElementById('decisionLabel');
+                    const advTitle = document.getElementById('advisoryTitle');
+                    const advBody = document.getElementById('advisoryBody');
 
-                const isQualified = res.prediction.toLowerCase() === 'yes';
-                const badge = document.getElementById('outcomeBadge');
-                const outcomeText = document.getElementById('outcomeText');
-                const riskLevel = document.getElementById('riskLevel');
-                const advisoryText = document.getElementById('advisoryText');
-                const consistencyScore = document.getElementById('consistencyScore');
+                    if (isPositive) {
+                        badge.className = 'status-badge badge-success';
+                        badge.innerHTML = '<i class="fa-solid fa-circle-check"></i> PASS PROSPECT';
+                        decision.innerText = 'High probability of passing target';
+                        advTitle.innerText = 'High Academic Stability Detected';
+                        advBody.innerText = 'Student demonstrates strong metric consistency. Retain study regimen and encourage leadership in extracurricular activities.';
+                    } else {
+                        badge.className = 'status-badge badge-danger';
+                        badge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> RISK DETECTED';
+                        decision.innerText = 'At risk of academic underperformance';
+                        advTitle.innerText = 'Targeted Intervention Advised';
+                        advBody.innerText = 'Current attendance and score trends suggest intervention is needed. Prioritize mandatory tutoring and weekly review checkpoints.';
+                    }
 
-                if (isQualified) {
-                    badge.className = 'badge-status badge-positive';
-                    outcomeText.innerHTML = 'Positive (Pass/Qualified)';
-                    riskLevel.innerText = 'Low Priority';
-                    riskLevel.style.color = '#34d399';
-                    advisoryText.innerText = 'Student parameters fall within standard passing bounds. Maintain study cadence and weekly assignments.';
-                } else {
-                    badge.className = 'badge-status badge-warning';
-                    outcomeText.innerHTML = 'At Risk (Unqualified/Fail)';
-                    riskLevel.innerText = 'High Priority';
-                    riskLevel.style.color = '#fb7185';
-                    advisoryText.innerText = 'Alert: Low study intensity or low attendance observed. Recommended intervention: peer tutoring and attendance follow-ups.';
+                    // Delta computation
+                    const diff = (data.features.final_score - data.features.prev_score).toFixed(1);
+                    const deltaEl = document.getElementById('deltaScore');
+                    deltaEl.innerText = (diff >= 0 ? '+' : '') + diff;
+
+                    // Engagement computation
+                    document.getElementById('engagementIdx').innerText = Math.round(data.features.attendance) + '%';
+
+                    // Update Charts
+                    const studyNorm = Math.min((data.features.study_hours / 30) * 100, 100);
+                    const envNorm = ((data.features.parent_edu / 3) * 50) + (data.features.internet * 50);
+
+                    radarChart.data.datasets[0].data = [
+                        studyNorm,
+                        data.features.attendance,
+                        data.features.prev_score,
+                        data.features.final_score,
+                        envNorm
+                    ];
+                    radarChart.update();
+
+                    barChart.data.datasets[0].data = [
+                        data.features.prev_score,
+                        data.features.final_score,
+                        data.features.study_hours
+                    ];
+                    barChart.update();
                 }
-
-                // Consistency Index Calculation
-                const avgScore = ((res.features.prev_score + res.features.final_score + res.features.attendance) / 3).toFixed(1);
-                consistencyScore.innerText = `${avgScore}%`;
-
-                // Update Charts
-                const studyNorm = Math.min((res.features.study_hours / 30) * 100, 100);
-                radarChart.data.datasets[0].data = [
-                    studyNorm,
-                    res.features.attendance,
-                    res.features.prev_score,
-                    res.features.final_score,
-                    (res.features.parent_edu / 3) * 100
-                ];
-                radarChart.update();
-
-                barChart.data.datasets[0].data = [
-                    res.features.prev_score,
-                    res.features.final_score,
-                    res.features.attendance
-                ];
-                barChart.update();
-
             } catch (err) {
-                console.error("Inference Error:", err);
+                console.error("Prediction error:", err);
             }
         });
     </script>
@@ -645,33 +682,39 @@ def index():
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
-        # Extract features matching the model's exact signature:
-        # ['gender', 'age', 'study_hours_per_week', 'attendance_rate', 'parent_education', 'internet_access', 'extracurricular', 'previous_score', 'final_score']
         gender = float(request.form.get('gender', 0))
         age = float(request.form.get('age', 18))
-        study_hours = float(request.form.get('study_hours', 10.0))
-        attendance = float(request.form.get('attendance', 75.0))
-        parent_edu = float(request.form.get('parent_edu', 1))
-        internet = float(request.form.get('internet', 1))
+        study_hours = float(request.form.get('study_hours', 0))
+        attendance = float(request.form.get('attendance', 0))
+        parent_edu = float(request.form.get('parent_edu', 0))
+        internet = float(request.form.get('internet', 0))
         extracurricular = float(request.form.get('extracurricular', 0))
-        prev_score = float(request.form.get('prev_score', 60.0))
-        final_score = float(request.form.get('final_score', 65.0))
+        prev_score = float(request.form.get('prev_score', 0))
+        final_score = float(request.form.get('final_score', 0))
 
+        # Vector aligns with: ['gender', 'age', 'study_hours_per_week', 'attendance_rate', 
+        #                      'parent_education', 'internet_access', 'extracurricular', 
+        #                      'previous_score', 'final_score']
         features = np.array([[gender, age, study_hours, attendance, parent_edu, internet, extracurricular, prev_score, final_score]])
 
-        if model:
-            pred = model.predict(features)[0]
+        if model is not None:
+            raw_pred = model.predict(features)[0]
+            prediction = str(raw_pred)
         else:
-            # Fallback heuristic if running without pickle in testing environment
-            pred = "Yes" if (attendance >= 70 and final_score >= 50) else "No"
+            # Fallback heuristic if model file isn't found in current directory
+            prediction = "Yes" if (attendance >= 75 and (final_score + prev_score) / 2 >= 60) else "No"
 
         return jsonify({
             'status': 'success',
-            'prediction': str(pred),
+            'prediction': prediction,
             'features': {
+                'gender': gender,
+                'age': age,
                 'study_hours': study_hours,
                 'attendance': attendance,
                 'parent_edu': parent_edu,
+                'internet': internet,
+                'extracurricular': extracurricular,
                 'prev_score': prev_score,
                 'final_score': final_score
             }
@@ -679,6 +722,8 @@ def predict():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
+# Vercel WSGI entry point
+app_handler = app
+
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=True)
