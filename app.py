@@ -7,385 +7,392 @@ app = Flask(__name__)
 
 MODEL_PATH = 'model.pkl'
 
-# Load the model directly using pickle
+# Load the trained SVC model
 model = None
 if os.path.exists(MODEL_PATH):
-    with open(MODEL_PATH, 'rb') as f:
-        model = pickle.load(f)
+    try:
+        with open(MODEL_PATH, 'rb') as f:
+            model = pickle.load(f)
+    except Exception as e:
+        print(f"Error loading {MODEL_PATH}: {e}")
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
-<html lang="en" data-theme="emerald">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Student Performance Analytics Dashboard</title>
+    <title>EduPulse AI | Student Performance Analytics</title>
     <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
     <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root[data-theme="emerald"] {
-            --bg-primary: #0b132b;
-            --bg-secondary: #1c2541;
-            --bg-card: rgba(28, 37, 65, 0.7);
-            --accent-primary: #10b981;
-            --accent-secondary: #06b6d4;
-            --accent-gradient: linear-gradient(135deg, #10b981, #06b6d4);
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --border-color: rgba(255, 255, 255, 0.1);
-            --shadow-glow: 0 10px 30px -10px rgba(16, 185, 129, 0.3);
-            --input-bg: rgba(15, 23, 42, 0.6);
-        }
-
-        :root[data-theme="cyber"] {
-            --bg-primary: #09090e;
-            --bg-secondary: #161623;
-            --bg-card: rgba(22, 22, 35, 0.85);
-            --accent-primary: #ff007f;
-            --accent-secondary: #7928ca;
-            --accent-gradient: linear-gradient(135deg, #ff007f, #7928ca);
-            --text-main: #ffffff;
-            --text-muted: #a0a0b8;
-            --border-color: rgba(255, 0, 127, 0.2);
-            --shadow-glow: 0 10px 30px -10px rgba(255, 0, 127, 0.4);
-            --input-bg: rgba(10, 10, 18, 0.8);
-        }
-
-        :root[data-theme="velvet"] {
-            --bg-primary: #0f172a;
-            --bg-secondary: #1e1b4b;
-            --bg-card: rgba(30, 27, 75, 0.75);
-            --accent-primary: #8b5cf6;
-            --accent-secondary: #ec4899;
-            --accent-gradient: linear-gradient(135deg, #8b5cf6, #ec4899);
-            --text-main: #f8fafc;
-            --text-muted: #cbd5e1;
-            --border-color: rgba(139, 92, 246, 0.25);
-            --shadow-glow: 0 10px 30px -10px rgba(139, 92, 246, 0.4);
-            --input-bg: rgba(15, 23, 42, 0.7);
-        }
-
-        :root[data-theme="sunset"] {
-            --bg-primary: #1c1917;
-            --bg-secondary: #292524;
-            --bg-card: rgba(41, 37, 36, 0.8);
-            --accent-primary: #f97316;
-            --accent-secondary: #eab308;
-            --accent-gradient: linear-gradient(135deg, #f97316, #eab308);
-            --text-main: #fafaf9;
-            --text-muted: #a8a29e;
-            --border-color: rgba(249, 115, 22, 0.2);
-            --shadow-glow: 0 10px 30px -10px rgba(249, 115, 22, 0.35);
-            --input-bg: rgba(12, 10, 9, 0.7);
+        :root {
+            --bg-base: #090d16;
+            --bg-surface: #111827;
+            --bg-surface-elevated: #1a2234;
+            --border-subtle: #1f293d;
+            --border-active: #3b82f6;
+            --brand-primary: #4f46e5;
+            --brand-gradient: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
+            --accent-green: #10b981;
+            --accent-red: #f43f5e;
+            --text-heading: #f8fafc;
+            --text-body: #94a3b8;
+            --text-muted: #64748b;
         }
 
         * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
-            transition: background-color 0.3s ease, border-color 0.3s ease;
+            font-family: 'Inter', sans-serif;
         }
 
         body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background-color: var(--bg-primary);
-            color: var(--text-main);
+            background-color: var(--bg-base);
+            color: var(--text-heading);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            overflow-x: hidden;
         }
 
-        /* Glassmorphism Header */
-        header {
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(16px);
-            border-bottom: 1px solid var(--border-color);
+        /* Top Navigation Bar */
+        .topbar {
+            height: 70px;
+            background: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(14px);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2rem;
             position: sticky;
             top: 0;
-            z-index: 100;
-            padding: 1rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            z-index: 50;
         }
 
-        .logo {
+        .brand-container {
             display: flex;
             align-items: center;
             gap: 12px;
-            font-size: 1.3rem;
-            font-weight: 800;
-            background: var(--accent-gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
         }
 
-        .theme-selector {
+        .brand-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: var(--brand-gradient);
             display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            color: #ffffff;
+            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+        }
+
+        .brand-title {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+        }
+
+        .brand-badge {
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 6px;
+            background: rgba(79, 70, 229, 0.15);
+            color: #818cf8;
+            border: 1px solid rgba(129, 140, 248, 0.3);
+            text-transform: uppercase;
+        }
+
+        .system-status {
+            display: flex;
+            align-items: center;
             gap: 8px;
-            background: var(--input-bg);
-            padding: 6px;
-            border-radius: 30px;
-            border: 1px solid var(--border-color);
+            font-size: 0.85rem;
+            color: var(--text-body);
         }
 
-        .theme-btn {
-            width: 28px;
-            height: 28px;
+        .status-dot {
+            width: 9px;
+            height: 9px;
             border-radius: 50%;
-            border: 2px solid transparent;
-            cursor: pointer;
-            transition: transform 0.2s;
+            background: var(--accent-green);
+            box-shadow: 0 0 10px var(--accent-green);
         }
 
-        .theme-btn:hover { transform: scale(1.15); }
-        .theme-btn.active { border-color: var(--text-main); }
+        .status-dot.offline {
+            background: #f59e0b;
+            box-shadow: 0 0 10px #f59e0b;
+        }
 
-        .theme-btn[data-t="emerald"] { background: linear-gradient(135deg, #10b981, #06b6d4); }
-        .theme-btn[data-t="cyber"] { background: linear-gradient(135deg, #ff007f, #7928ca); }
-        .theme-btn[data-t="velvet"] { background: linear-gradient(135deg, #8b5cf6, #ec4899); }
-        .theme-btn[data-t="sunset"] { background: linear-gradient(135deg, #f97316, #eab308); }
-
-        /* Main Container Layout */
-        .container {
-            max-width: 1400px;
-            margin: 2rem auto;
-            padding: 0 1.5rem;
-            display: grid;
-            grid-template-columns: 1fr 1.1fr;
-            gap: 2rem;
+        /* Main Viewport Container */
+        .dashboard-wrapper {
+            max-width: 1440px;
             width: 100%;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 460px 1fr;
+            gap: 2rem;
             flex: 1;
         }
 
-        @media (max-width: 1024px) {
-            .container { grid-template-columns: 1fr; }
+        @media (max-width: 1100px) {
+            .dashboard-wrapper {
+                grid-template-columns: 1fr;
+            }
         }
 
-        /* Glass Cards */
-        .card {
-            background: var(--bg-card);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--border-color);
-            border-radius: 20px;
-            padding: 2rem;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-            animation: fadeIn 0.6s ease-out forwards;
+        /* Glass Panel Blocks */
+        .glass-panel {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            padding: 1.75rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
         }
 
-        .card-header {
+        .panel-header {
             margin-bottom: 1.5rem;
             display: flex;
-            align-items: center;
             justify-content: space-between;
+            align-items: flex-start;
         }
 
-        .card-title {
-            font-size: 1.25rem;
+        .panel-header h2 {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 1.15rem;
             font-weight: 700;
+            color: var(--text-heading);
             display: flex;
             align-items: center;
             gap: 10px;
         }
 
-        .card-title i {
-            color: var(--accent-primary);
+        .panel-header p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 4px;
         }
 
-        /* Form Grid Controls */
+        /* Input Controls */
         .form-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1.2rem;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
         }
 
-        @media (max-width: 640px) {
-            .form-grid { grid-template-columns: 1fr; }
-        }
-
-        .form-group {
+        .form-field {
             display: flex;
             flex-direction: column;
             gap: 6px;
         }
 
-        .form-group.full-width {
+        .form-field.full {
             grid-column: span 2;
         }
 
         label {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             font-weight: 600;
-            color: var(--text-muted);
+            color: var(--text-body);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.4px;
         }
 
         input, select {
             width: 100%;
-            padding: 0.75rem 1rem;
-            background: var(--input-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            color: var(--text-main);
-            font-family: inherit;
+            background: var(--bg-surface-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 0.75rem 0.9rem;
+            color: #ffffff;
             font-size: 0.95rem;
             outline: none;
             transition: all 0.2s ease;
         }
 
         input:focus, select:focus {
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+            border-color: var(--border-active);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
         }
 
-        /* Submit Button */
-        .submit-btn {
+        .btn-predict {
             margin-top: 1.5rem;
             width: 100%;
-            padding: 1rem;
+            background: var(--brand-gradient);
             border: none;
-            border-radius: 12px;
-            background: var(--accent-gradient);
-            color: white;
-            font-weight: 700;
+            border-radius: 10px;
+            color: #ffffff;
             font-size: 1rem;
+            font-weight: 700;
+            padding: 1rem;
             cursor: pointer;
-            box-shadow: var(--shadow-glow);
-            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 18px rgba(79, 70, 229, 0.35);
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 10px;
+            transition: transform 0.15s ease, filter 0.2s ease;
         }
 
-        .submit-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 15px 35px -5px rgba(0,0,0,0.5);
+        .btn-predict:hover {
+            filter: brightness(1.1);
+            transform: translateY(-1px);
         }
 
-        .submit-btn:active { transform: translateY(0); }
+        .btn-predict:active {
+            transform: translateY(0);
+        }
 
-        /* Results & Dashboard Dashboard Styling */
-        .analytics-panel {
+        /* Analytics & Intelligence Views */
+        .analytics-column {
             display: flex;
             flex-direction: column;
             gap: 1.5rem;
         }
 
-        .result-card {
-            background: rgba(15, 23, 42, 0.5);
-            border-radius: 16px;
-            padding: 1.5rem;
-            border: 1px solid var(--border-color);
+        .kpi-deck {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .kpi-deck {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .kpi-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 14px;
+            padding: 1.25rem;
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: relative;
-            overflow: hidden;
+            flex-direction: column;
+            gap: 8px;
         }
 
-        .result-card::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 6px;
-            background: var(--accent-gradient);
-        }
-
-        .prediction-badge {
-            font-size: 2rem;
-            font-weight: 800;
-            padding: 0.2rem 1.5rem;
-            border-radius: 30px;
-            letter-spacing: 1px;
+        .kpi-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
             text-transform: uppercase;
-            animation: pulse 2s infinite;
+            letter-spacing: 0.5px;
         }
 
-        .badge-pass { background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; }
-        .badge-fail { background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; }
+        .kpi-val {
+            font-size: 1.6rem;
+            font-weight: 800;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            color: var(--text-heading);
+        }
+
+        .badge-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            width: fit-content;
+        }
+
+        .badge-positive {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .badge-warning {
+            background: rgba(244, 63, 94, 0.15);
+            color: #fb7185;
+            border: 1px solid rgba(244, 63, 94, 0.3);
+        }
+
+        .charts-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 900px) {
+            .charts-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 14px;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+        }
 
         .chart-container {
             position: relative;
-            height: 300px;
+            height: 240px;
             width: 100%;
             margin-top: 1rem;
         }
 
-        /* Keyframe Animations */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(15px); }
-            to { opacity: 1; transform: translateY(0); }
+        .advisory-box {
+            background: var(--bg-surface-elevated);
+            border-left: 4px solid var(--brand-primary);
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            font-size: 0.9rem;
+            color: var(--text-body);
+            line-height: 1.6;
         }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.03); }
-            100% { transform: scale(1); }
-        }
-
-        /* Status Banner */
-        .status-alert {
-            padding: 0.8rem 1rem;
-            border-radius: 10px;
-            font-size: 0.85rem;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .status-success { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-        .status-warning { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
     </style>
 </head>
 <body>
 
-    <header>
-        <div class="logo">
-            <i class="fa-solid fa-microchip"></i>
-            <span>SVC Model Analytics</span>
+    <nav class="topbar">
+        <div class="brand-container">
+            <div class="brand-icon"><i class="fa-solid fa-graduation-cap"></i></div>
+            <div>
+                <span class="brand-title">EduPulse</span>
+                <span class="brand-badge">Predictive Engine v2.0</span>
+            </div>
         </div>
-        <div class="theme-selector">
-            <div class="theme-btn active" data-t="emerald" title="Emerald Dark"></div>
-            <div class="theme-btn" data-t="cyber" title="Cyberpunk Neon"></div>
-            <div class="theme-btn" data-t="velvet" title="Royal Velvet"></div>
-            <div class="theme-btn" data-t="sunset" title="Sunset Amber"></div>
+        <div class="system-status">
+            {% if model_loaded %}
+            <span class="status-dot"></span> <span>Model Loaded (RBF-SVC)</span>
+            {% else %}
+            <span class="status-dot offline"></span> <span>Fallback Mode (`model.pkl` missing)</span>
+            {% endif %}
         </div>
-    </header>
+    </nav>
 
-    <div class="container">
-        <!-- Input Section -->
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">
-                    <i class="fa-solid fa-sliders"></i> Feature Parameters
+    <div class="dashboard-wrapper">
+        <!-- Input Parameters Side -->
+        <div class="glass-panel">
+            <div class="panel-header">
+                <div>
+                    <h2><i class="fa-solid fa-sliders"></i> Student Demographics & Records</h2>
+                    <p>Enter normalized attributes to compute performance outlook.</p>
                 </div>
             </div>
 
-            {% if not model_loaded %}
-            <div class="status-alert status-warning">
-                <i class="fa-solid fa-triangle-exclamation"></i>
-                `model.pkl` not detected. Using heuristic fallbacks for display.
-            </div>
-            {% else %}
-            <div class="status-alert status-success">
-                <i class="fa-solid fa-circle-check"></i>
-                Model file loaded successfully!
-            </div>
-            {% endif %}
-
-            <form id="predictionForm">
+            <form id="evaluationForm">
                 <div class="form-grid">
-                    <div class="form-group">
+                    <div class="form-field">
                         <label>Gender</label>
                         <select name="gender">
                             <option value="0">Female</option>
@@ -393,112 +400,125 @@ HTML_TEMPLATE = """
                         </select>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-field">
                         <label>Age</label>
-                        <input type="number" name="age" value="18" min="10" max="100" required>
+                        <input type="number" name="age" value="18" min="12" max="65" required>
                     </div>
 
-                    <div class="form-group">
-                        <label>Weekly Study (hrs)</label>
-                        <input type="number" step="0.1" name="study_hours" value="15.5" required>
+                    <div class="form-field">
+                        <label>Weekly Study (Hours)</label>
+                        <input type="number" step="0.1" name="study_hours" value="16.5" min="0" max="80" required>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-field">
                         <label>Attendance Rate (%)</label>
-                        <input type="number" step="0.1" name="attendance" value="85.0" min="0" max="100" required>
+                        <input type="number" step="0.1" name="attendance" value="88.0" min="0" max="100" required>
                     </div>
 
-                    <div class="form-group">
-                        <label>Parent Education Level</label>
+                    <div class="form-field">
+                        <label>Parental Education</label>
                         <select name="parent_edu">
                             <option value="0">High School</option>
-                            <option value="1" selected>Bachelor's</option>
-                            <option value="2">Master's</option>
+                            <option value="1" selected>Bachelor's Degree</option>
+                            <option value="2">Master's Degree</option>
                             <option value="3">Doctorate</option>
                         </select>
                     </div>
 
-                    <div class="form-group">
-                        <label>Internet Access</label>
+                    <div class="form-field">
+                        <label>Home Internet</label>
                         <select name="internet">
-                            <option value="1">Yes</option>
-                            <option value="0">No</option>
+                            <option value="1">Available</option>
+                            <option value="0">Not Available</option>
                         </select>
                     </div>
 
-                    <div class="form-group">
-                        <label>Extracurriculars</label>
+                    <div class="form-field">
+                        <label>Extracurricular</label>
                         <select name="extracurricular">
-                            <option value="1">Yes</option>
-                            <option value="0">No</option>
+                            <option value="1">Active</option>
+                            <option value="0">None</option>
                         </select>
                     </div>
 
-                    <div class="form-group">
-                        <label>Previous Score</label>
-                        <input type="number" step="0.1" name="prev_score" value="72.5" required>
+                    <div class="form-field">
+                        <label>Previous Score (0-100)</label>
+                        <input type="number" step="0.1" name="prev_score" value="74.0" min="0" max="100" required>
                     </div>
 
-                    <div class="form-group full-width">
-                        <label>Final Score (Current/Midterm)</label>
-                        <input type="number" step="0.1" name="final_score" value="78.0" required>
+                    <div class="form-field full">
+                        <label>Final / Midterm Score (0-100)</label>
+                        <input type="number" step="0.1" name="final_score" value="82.5" min="0" max="100" required>
                     </div>
                 </div>
 
-                <button type="submit" class="submit-btn">
-                    <i class="fa-solid fa-chart-line"></i> Run Machine Prediction
+                <button type="submit" class="btn-predict">
+                    <i class="fa-solid fa-bolt"></i> Evaluate Student Profile
                 </button>
             </form>
         </div>
 
-        <!-- Dashboard Output Analytics -->
-        <div class="analytics-panel">
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <i class="fa-solid fa-square-poll-vertical"></i> Output Prediction
+        <!-- Right Side Analytics -->
+        <div class="analytics-column">
+            <!-- KPI Summary Cards -->
+            <div class="kpi-deck">
+                <div class="kpi-card">
+                    <span class="kpi-label">Outcome Assessment</span>
+                    <div id="outcomeBadge" class="badge-status badge-positive">
+                        <i class="fa-solid fa-circle-check"></i> <span id="outcomeText">Qualified (Yes)</span>
                     </div>
                 </div>
 
-                <div class="result-card">
-                    <div>
-                        <div style="font-size: 0.85rem; color: var(--text-muted);">PREDICTED TARGET</div>
-                        <div style="font-size: 1.1rem; font-weight: 600; margin-top: 4px;">Student Status</div>
-                    </div>
-                    <div id="predictionResult" class="prediction-badge badge-pass">--</div>
+                <div class="kpi-card">
+                    <span class="kpi-label">Consistency Index</span>
+                    <div class="kpi-val" id="consistencyScore">86.2%</div>
                 </div>
 
-                <div class="chart-container">
-                    <canvas id="analyticsChart"></canvas>
+                <div class="kpi-card">
+                    <span class="kpi-label">Intervention Priority</span>
+                    <div class="kpi-val" id="riskLevel" style="color: #34d399; font-size: 1.3rem;">Minimal</div>
+                </div>
+            </div>
+
+            <!-- Visual Analytics Grid -->
+            <div class="charts-row">
+                <div class="chart-card">
+                    <span class="kpi-label">Holistic Competency Radar</span>
+                    <div class="chart-container">
+                        <canvas id="radarChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <span class="kpi-label">Academic vs Cohort Benchmark</span>
+                    <div class="chart-container">
+                        <canvas id="barChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prescriptive Advisory -->
+            <div class="glass-panel" style="padding: 1.25rem;">
+                <span class="kpi-label" style="display: block; margin-bottom: 0.5rem;">Diagnostic Insight</span>
+                <div id="advisoryText" class="advisory-box">
+                    Student exhibits strong classroom engagement and consistent academic retention. Continuation of current study habits is projected to maintain high outcomes.
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Theme Switcher Logic
-        const themeBtns = document.querySelectorAll('.theme-btn');
-        themeBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                themeBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                const theme = btn.getAttribute('data-t');
-                document.documentElement.setAttribute('data-theme', theme);
-                updateChartColors();
-            });
-        });
-
-        // Initialize Dynamic Chart
-        const ctx = document.getElementById('analyticsChart').getContext('2d');
-        let chart = new Chart(ctx, {
+        // Setup Radar Chart
+        const radarCtx = document.getElementById('radarChart').getContext('2d');
+        const radarChart = new Chart(radarCtx, {
             type: 'radar',
             data: {
-                labels: ['Study Hours', 'Attendance', 'Prev Score', 'Final Score', 'Parent Edu (x25)'],
+                labels: ['Study Intensity', 'Attendance', 'Prior Retention', 'Current Term', 'Socio-Edu Support'],
                 datasets: [{
-                    label: 'Metrics Normalized Score',
-                    data: [60, 85, 72.5, 78, 25],
-                    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                    borderColor: '#10b981',
+                    label: 'Student Profile',
+                    data: [55, 88, 74, 82.5, 50],
+                    backgroundColor: 'rgba(79, 70, 229, 0.25)',
+                    borderColor: '#6366f1',
                     borderWidth: 2,
                     pointBackgroundColor: '#06b6d4'
                 }]
@@ -508,59 +528,110 @@ HTML_TEMPLATE = """
                 maintainAspectRatio: false,
                 scales: {
                     r: {
-                        angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
-                        grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                        pointLabels: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 11 } },
+                        angleLines: { color: 'rgba(255, 255, 255, 0.08)' },
+                        grid: { color: 'rgba(255, 255, 255, 0.08)' },
+                        pointLabels: { color: '#94a3b8', font: { size: 10, family: 'Inter' } },
                         ticks: { display: false }
                     }
                 },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        // Setup Cohort Benchmark Bar Chart
+        const barCtx = document.getElementById('barChart').getContext('2d');
+        const barChart = new Chart(barCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Prev Score', 'Final Score', 'Attendance'],
+                datasets: [
+                    {
+                        label: 'Student',
+                        data: [74.0, 82.5, 88.0],
+                        backgroundColor: '#4f46e5',
+                        borderRadius: 6
+                    },
+                    {
+                        label: 'Median Cohort',
+                        data: [65.0, 68.0, 75.0],
+                        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                        borderRadius: 6
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: '#94a3b8' } },
+                    y: { max: 100, grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8' } }
+                },
                 plugins: {
-                    legend: { labels: { color: '#f8fafc', font: { family: 'Plus Jakarta Sans' } } }
+                    legend: { labels: { color: '#cbd5e1', font: { size: 11 } } }
                 }
             }
         });
 
-        function updateChartColors() {
-            const style = getComputedStyle(document.documentElement);
-            const primary = style.getPropertyValue('--accent-primary').trim();
-            const secondary = style.getPropertyValue('--accent-secondary').trim();
-
-            chart.data.datasets[0].borderColor = primary;
-            chart.data.datasets[0].pointBackgroundColor = secondary;
-            chart.data.datasets[0].backgroundColor = primary + '33'; // hex opacity
-            chart.update();
-        }
-
-        // Async Form Submission
-        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
+        // Form Submit Handler
+        document.getElementById('evaluationForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
 
-            const response = await fetch('/predict', {
-                method: 'POST',
-                body: formData
-            });
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+                const res = await response.json();
 
-            const data = await response.json();
-            const badge = document.getElementById('predictionResult');
-            badge.innerText = data.prediction;
+                if (res.status !== 'success') return;
 
-            if (data.prediction.toLowerCase() === 'yes') {
-                badge.className = 'prediction-badge badge-pass';
-            } else {
-                badge.className = 'prediction-badge badge-fail';
+                const isQualified = res.prediction.toLowerCase() === 'yes';
+                const badge = document.getElementById('outcomeBadge');
+                const outcomeText = document.getElementById('outcomeText');
+                const riskLevel = document.getElementById('riskLevel');
+                const advisoryText = document.getElementById('advisoryText');
+                const consistencyScore = document.getElementById('consistencyScore');
+
+                if (isQualified) {
+                    badge.className = 'badge-status badge-positive';
+                    outcomeText.innerHTML = 'Positive (Pass/Qualified)';
+                    riskLevel.innerText = 'Low Priority';
+                    riskLevel.style.color = '#34d399';
+                    advisoryText.innerText = 'Student parameters fall within standard passing bounds. Maintain study cadence and weekly assignments.';
+                } else {
+                    badge.className = 'badge-status badge-warning';
+                    outcomeText.innerHTML = 'At Risk (Unqualified/Fail)';
+                    riskLevel.innerText = 'High Priority';
+                    riskLevel.style.color = '#fb7185';
+                    advisoryText.innerText = 'Alert: Low study intensity or low attendance observed. Recommended intervention: peer tutoring and attendance follow-ups.';
+                }
+
+                // Consistency Index Calculation
+                const avgScore = ((res.features.prev_score + res.features.final_score + res.features.attendance) / 3).toFixed(1);
+                consistencyScore.innerText = `${avgScore}%`;
+
+                // Update Charts
+                const studyNorm = Math.min((res.features.study_hours / 30) * 100, 100);
+                radarChart.data.datasets[0].data = [
+                    studyNorm,
+                    res.features.attendance,
+                    res.features.prev_score,
+                    res.features.final_score,
+                    (res.features.parent_edu / 3) * 100
+                ];
+                radarChart.update();
+
+                barChart.data.datasets[0].data = [
+                    res.features.prev_score,
+                    res.features.final_score,
+                    res.features.attendance
+                ];
+                barChart.update();
+
+            } catch (err) {
+                console.error("Inference Error:", err);
             }
-
-            // Update Radar Chart Metrics dynamically
-            const studyNormalized = Math.min((data.features.study_hours / 30) * 100, 100);
-            chart.data.datasets[0].data = [
-                studyNormalized,
-                data.features.attendance,
-                data.features.prev_score,
-                data.features.final_score,
-                (data.features.parent_edu / 3) * 100
-            ];
-            chart.update();
         });
     </script>
 </body>
@@ -574,28 +645,29 @@ def index():
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
+        # Extract features matching the model's exact signature:
+        # ['gender', 'age', 'study_hours_per_week', 'attendance_rate', 'parent_education', 'internet_access', 'extracurricular', 'previous_score', 'final_score']
         gender = float(request.form.get('gender', 0))
         age = float(request.form.get('age', 18))
-        study_hours = float(request.form.get('study_hours', 0))
-        attendance = float(request.form.get('attendance', 0))
-        parent_edu = float(request.form.get('parent_edu', 0))
-        internet = float(request.form.get('internet', 0))
+        study_hours = float(request.form.get('study_hours', 10.0))
+        attendance = float(request.form.get('attendance', 75.0))
+        parent_edu = float(request.form.get('parent_edu', 1))
+        internet = float(request.form.get('internet', 1))
         extracurricular = float(request.form.get('extracurricular', 0))
-        prev_score = float(request.form.get('prev_score', 0))
-        final_score = float(request.form.get('final_score', 0))
+        prev_score = float(request.form.get('prev_score', 60.0))
+        final_score = float(request.form.get('final_score', 65.0))
 
-        # Reconstruct feature array according to model schema
         features = np.array([[gender, age, study_hours, attendance, parent_edu, internet, extracurricular, prev_score, final_score]])
 
         if model:
-            prediction = model.predict(features)[0]
+            pred = model.predict(features)[0]
         else:
-            # Fallback evaluation metric if running standalone without PKL binary in directory
-            prediction = "Yes" if (attendance > 75 and final_score > 50) else "No"
+            # Fallback heuristic if running without pickle in testing environment
+            pred = "Yes" if (attendance >= 70 and final_score >= 50) else "No"
 
         return jsonify({
             'status': 'success',
-            'prediction': str(prediction),
+            'prediction': str(pred),
             'features': {
                 'study_hours': study_hours,
                 'attendance': attendance,
@@ -608,4 +680,5 @@ def predict():
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
